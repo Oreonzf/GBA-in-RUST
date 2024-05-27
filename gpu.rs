@@ -1,121 +1,93 @@
 use minifb::{Key, Window, WindowOptions};
 
 pub struct Gpu {
-    pub screen: Screen,
-}
-
-pub struct Screen {
-    width: usize,
-    height: usize,
-    pixels: Vec<u32>,
-}
-
-impl Screen {
-    pub fn new(width: usize, height: usize) -> Self {
-        let pixels = vec![0; width * height];
-        Screen { width, height, pixels }
-    }
-
-    pub fn draw_pixel(&mut self, x: usize, y: usize, color: u32) {
-        if x < self.width && y < self.height {
-            let index = y * self.width + x;
-            self.pixels[index] = color;
-        }
-    }
-
-    pub fn clear(&mut self) {
-        self.pixels.iter_mut().for_each(|pixel| *pixel = 0);
-    }
-
-    pub fn get_pixels(&self) -> &[u32] {
-        &self.pixels
-    }
+    screen_width: u32,
+    screen_height: u32,
+    frame_buffer: Vec<u32>,
+    image_x: usize,
+    image_y: usize,
 }
 
 impl Gpu {
-    pub fn new(screen_width: usize, screen_height: usize) -> Self {
-        let screen = Screen::new(screen_width, screen_height);
-        Gpu { screen }
+    pub fn new(screen_width: u32, screen_height: u32) -> Self {
+        let frame_buffer_size = (screen_width * screen_height) as usize;
+        let frame_buffer = vec![0; frame_buffer_size];
+
+        Gpu {
+            screen_width,
+            screen_height,
+            frame_buffer,
+            image_x: 300,   // Posição inicial da imagem (x)
+            image_y: 200,   // Posição inicial da imagem (y)
+        }
     }
 
-    pub fn draw_pixel(&mut self, x: u32, y: u32, color: u32) {
-        self.screen.draw_pixel(x as usize, y as usize, color);
+    pub fn open_window(&self) -> Window {
+        Window::new(
+            "Pixelated Heart",
+            self.screen_width as usize,
+            self.screen_height as usize,
+            WindowOptions::default(),
+        )
+        .expect("Error creating window")
+    }
+
+    pub fn render_frame(&self) {
+        println!("Rendering a frame on the screen...");
     }
 
     pub fn clear_screen(&mut self) {
-        self.screen.clear();
+        self.frame_buffer.iter_mut().for_each(|pixel| *pixel = 0);
     }
 
-    pub fn update_window(&mut self, window: &mut Window) {
-        let pixels = self.screen.get_pixels();
-        let width = self.screen.width;
-        let height = self.screen.height;
-        window.update_with_buffer(pixels, width, height).unwrap();
-    }
+    pub fn draw_rectangle(&mut self, x: usize, y: usize, width: usize, height: usize, color: u32) {
+        // Calcular as coordenadas do retângulo dentro dos limites da tela
+        let start_x = x.min(self.screen_width as usize);
+        let start_y = y.min(self.screen_height as usize);
+        let end_x = (x + width).min(self.screen_width as usize);
+        let end_y = (y + height).min(self.screen_height as usize);
 
-    pub fn draw_heart(&mut self, x: u32, y: u32, size: u32, color: u32) {
-        let half_size = size >> 1;
-    
-        // Desenhar a parte superior do coração (dois triângulos)
-        for dy in 0..half_size {
-            let dx = (half_size.saturating_sub(dy)) << 1;  // Use saturating_sub para evitar estouro
-    
-            // Desenhar os pixels da parte esquerda do coração
-            for i in 0..=dx {
-                if let Some(px) = (x as i32 + half_size as i32 - dx as i32 + i as i32).checked_sub(1) {
-                    let px = px as usize;
-                    if px < self.screen.width {
-                        self.draw_pixel(px as u32, y + dy, color);
-                    }
-                }
-            }
-    
-            // Desenhar os pixels da parte direita do coração
-            for i in 0..=dx {
-                if let Some(px) = (x as i32 + half_size as i32 + i as i32).checked_sub(1) {
-                    let px = px as usize;
-                    if px < self.screen.width {
-                        self.draw_pixel(px as u32, y + dy, color);
-                    }
-                }
-            }
-        }
-    
-        // Desenhar a parte inferior do coração (triângulo invertido)
-        for dy in 0..half_size {
-            let dx = dy << 1;  // Calcular dx para o triângulo invertido
-    
-            // Desenhar os pixels da parte inferior do coração
-            for i in 0..(size.saturating_sub(dx * 2)) {
-                if let Some(px) = (x as i32 + dx as i32 + i as i32).checked_sub(1) {
-                    let px = px as usize;
-                    if px < self.screen.width {
-                        self.draw_pixel(px as u32, y + half_size + dy, color);
-                    }
-                }
+        // Desenhar o retângulo na área válida da tela
+        for py in start_y..end_y {
+            for px in start_x..end_x {
+                let index = py * (self.screen_width as usize) + px;
+                self.frame_buffer[index] = color;
             }
         }
     }
-    
-}
 
-fn main() {
-    let width = 800;
-    let height = 600;
-    let mut window = Window::new("Pixelated Heart", width, height, WindowOptions::default())
-        .expect("Unable to create window");
+    pub fn update_window(&self, window: &mut Window) {
+        if let Some(frame_buffer) = self.get_frame_buffer() {
+            window
+                .update_with_buffer(frame_buffer, self.screen_width as usize, self.screen_height as usize)
+                .expect("Error updating window");
+        }
+    }
 
-    let mut gpu = Gpu::new(width, height);
+    fn get_frame_buffer(&self) -> Option<&[u32]> {
+        Some(&self.frame_buffer)
+    }
 
-    // Loop principal
-    while window.is_open() && !window.is_key_down(Key::Escape) {
-        // Limpa a janela
-        gpu.clear_screen();
+    pub fn move_image(&mut self, key: Key) {
+        match key {
+            Key::W => self.image_y = self.image_y.saturating_sub(5), // Move para cima
+            Key::A => self.image_x = self.image_x.saturating_sub(5), // Move para a esquerda
+            Key::S => self.image_y = self.image_y.saturating_add(5), // Move para baixo
+            Key::D => self.image_x = self.image_x.saturating_add(5), // Move para a direita
+            _ => {} // Ignora outras teclas
+        }
+    }
 
-        // Desenha um coração vermelho na tela
-        gpu.draw_heart(300, 200, 100, 0xFF0000);
+    pub fn send_test_command(&mut self) {
+        println!("Sending test command to the GPU...");
+        // Implemente a lógica necessária para o comando de teste aqui
+    }
 
-        // Atualiza a janela
-        gpu.update_window(&mut window);
+    pub fn get_image_x(&self) -> usize {
+        self.image_x
+    }
+
+    pub fn get_image_y(&self) -> usize {
+        self.image_y
     }
 }

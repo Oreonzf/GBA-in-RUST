@@ -1,131 +1,97 @@
-use crate::gpu::Gpu as CpuGpu;
+use crate::gpu::Gpu;
 use crate::memory::Memory;
-use crate::gpu::main;
 
-mod gpu;
-
-pub struct Cpu {}
-
-impl Cpu {
-    pub fn new() -> Self {
-        Cpu {}
-    }
-
-    pub fn execute_instruction(&mut self, memory: &mut Memory, gpu: &mut CpuGpu) {
-        let instruction_address = self.fetch_instruction_pointer();
-        let opcode = memory.read_byte(instruction_address) as u32;
-        self.decode_and_execute(opcode, memory, gpu);
-    }
-
-    fn fetch_instruction_pointer(&self) -> usize {
-        // Implemente a lógica real para buscar o endereço da próxima instrução
-        0 // Neste exemplo, retorna sempre zero
-    }
-
-    fn decode_and_execute(&mut self, opcode: u32, memory: &mut Memory, gpu: &mut CpuGpu) {
-        match opcode {
-            0x01 => self.execute_add(memory),
-            0x02 => self.execute_test_command(gpu),
-            _ => {
-                println!("Instrução não implementada: 0x{:X}", opcode);
-            }
-        }
-    }
-
-    fn execute_add(&mut self, memory: &mut Memory) {
-        // Lógica para a instrução Add
-        // Implemente sua lógica de adição aqui
-        println!("Executando instrução Add");
-    }
-
-    fn execute_test_command(&self, gpu: &mut CpuGpu) {
-        println!("Enviando comando de teste para a GPU...");
-        gpu.send_test_command(); // Assumindo que `send_test_command` está definido na struct `Gpu`
-    }
-}
-
-#[derive(Default, Clone)] // Implementação do trait Default e Clone
-pub struct Registers {
-    r: [u32; 16],
-    pc: u32,
-}
-
-#[derive(Clone)] // Implementação do trait Clone
+// Definition of the Instruction type (assuming it will be used in the module)
+#[derive(Debug, Clone)]
 pub enum Instruction {
     Add,
+    Sub,
+    Mul,
     TestCommand,
+    OpenWindow,
     Unknown(u32),
 }
 
-pub struct CpuState {
-    pub registers: Registers,
-    pipeline: Pipeline,
-    memory: Memory,
-    pub gpu: Gpu,
+pub struct Cpu<'a> {
+    pub gpu: &'a mut Gpu,
+    pub pipeline: Pipeline<u32>,
 }
 
-impl CpuState {
-    pub fn new(memory_data: Vec<u32>, gpu: Gpu) -> Self {
-        CpuState {
-            registers: Registers::default(),
-            pipeline: Pipeline::new(),
-            memory: Memory::new(memory_data),
+impl<'a> Cpu<'a> {
+    pub fn new(gpu: &'a mut Gpu) -> Self {
+        Cpu {
             gpu,
+            pipeline: Pipeline::new(),
         }
     }
 
-    pub fn execute_cycle(&mut self) {
-        self.pipeline.advance();
-        let pc = self.registers.read_pc() as usize;
-        self.pipeline.fetch_instruction(&self.memory, pc);
-        self.pipeline.decode_instruction();
-        self.execute_instruction();
+    pub fn execute_cycle(&mut self, memory: &mut Memory) {
+        // Fetch instruction and execute it
+        let instruction_address = self.gpu.get_instruction_address(); // Assuming this method exists
+        let opcode = memory.read_word(instruction_address);
+        let instruction = Instruction::from(opcode);
+
+        self.execute_instruction(instruction, memory, instruction_address, opcode);
+
+        // Update PC (Program Counter)
+        self.gpu.increment_pc(); // Assuming this method exists
     }
 
-    fn execute_instruction(&mut self) {
-        if let Some(instruction) = self.pipeline.get_current_instruction() {
-            match instruction {
-                Instruction::Add => {
-                    // Lógica para a instrução Add
-                }
-                Instruction::TestCommand => {
-                    println!("Enviando comando de teste para a GPU...");
-                    // Chamada do método corrigida para enviar um comando de teste para a GPU
-                    self.gpu.send_test_command();
-                }
-                Instruction::Unknown(_) => {
-                    unreachable!("Instrução desconhecida encontrada!");
-                }
+    fn execute_instruction(
+        &mut self,
+        instruction: Instruction,
+        memory: &mut Memory,
+        instruction_address: usize,
+        opcode: u32,
+    ) {
+        match instruction {
+            Instruction::Add => {
+                // Logic for Add instruction
+                println!("Executing Add instruction");
             }
-        } else {
-            println!("Nenhuma instrução para executar no momento.");
+            Instruction::Sub => {
+                // Logic for Sub instruction
+                println!("Executing Sub instruction");
+            }
+            Instruction::Mul => {
+                // Logic for Mul instruction
+                println!("Executing Mul instruction");
+            }
+            Instruction::TestCommand => {
+                // Execute test command for the GPU
+                self.execute_test_command();
+            }
+            Instruction::OpenWindow => {
+                // Open a window using the GPU
+                self.gpu.open_window(); // Assuming this method exists
+            }
+            Instruction::Unknown(op) => {
+                println!("Unknown instruction: 0x{:X}", op);
+            }
         }
+
+        // Fetch, decode, and update pipeline
+        self.pipeline.fetch_instruction(memory, instruction_address);
+        self.pipeline.decode_instruction();
+        self.pipeline.update(opcode);
+    }
+
+    pub fn execute_test_command(&mut self) {
+        println!("Sending test command to the GPU...");
+        // Call the `send_test_command` method of the GPU
+        self.gpu.send_test_command(); // Assuming this method exists
     }
 }
 
-struct Memory {
-    data: Vec<u32>,
+pub struct Pipeline<T> {
+    fetch: Option<T>,
+    decode: Option<T>,
+    execute: Option<T>,
+    writeback: Option<T>,
 }
 
-impl Memory {
-    fn new(memory_data: Vec<u32>) -> Self {
-        Memory { data: memory_data }
-    }
-
-    fn read_word(&self, address: usize) -> u32 {
-        self.data[address]
-    }
-}
-
-struct Pipeline {
-    fetch: Option<Instruction>,
-    decode: Option<Instruction>,
-    execute: Option<Instruction>,
-    writeback: Option<Instruction>,
-}
-
-impl Pipeline {
-    fn new() -> Self {
+impl Pipeline<u32> {
+    pub fn new() -> Self {
         Pipeline {
             fetch: None,
             decode: None,
@@ -134,27 +100,16 @@ impl Pipeline {
         }
     }
 
-    fn advance(&mut self) {
-        self.writeback = self.execute.take();
-        self.execute = self.decode.take();
-        self.decode = self.fetch.take();
-    }
-
-    fn get_current_instruction(&self) -> Option<Instruction> {
-        self.execute.clone()
-    }
-
-    fn fetch_instruction(&mut self, memory: &Memory, address: usize) {
+    pub fn fetch_instruction(&mut self, memory: &Memory, address: usize) {
         let opcode = memory.read_word(address);
-        let instruction = Instruction::from(opcode);
-        self.update(instruction);
+        self.update(opcode); // Update `fetch` with the `opcode` (u32)
     }
 
-    fn decode_instruction(&mut self) {
-        // Implemente a lógica de decodificação das instruções aqui
+    pub fn decode_instruction(&mut self) {
+        // Implement instruction decoding logic here
     }
 
-    fn update(&mut self, instruction: Instruction) {
+    pub fn update(&mut self, instruction: u32) {
         self.writeback = self.execute.take();
         self.execute = self.decode.take();
         self.decode = self.fetch.take();
@@ -162,11 +117,15 @@ impl Pipeline {
     }
 }
 
-impl From<u32> for Instruction {
-    fn from(opcode: u32) -> Self {
+impl Instruction {
+    pub fn from(opcode: u32) -> Self {
         match opcode {
-            // Defina instruções suportadas
-            _ => Instruction::Add, // Retorna Add para instruções não suportadas
+            0x01 => Instruction::Add,
+            0x02 => Instruction::Sub,
+            0x03 => Instruction::Mul,
+            0x04 => Instruction::TestCommand,
+            0x05 => Instruction::OpenWindow,
+            _ => Instruction::Unknown(opcode),
         }
     }
 }

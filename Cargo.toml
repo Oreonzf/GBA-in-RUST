@@ -1,0 +1,18 @@
+[package]
+name = "src"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+minifb = "0.27.0"
+hvm = "2.0.17"
+
+[[bin]]
+name = "src"
+path = "main.rs"
+
+[lib]
+name = "src"
+path = "lib.rs"

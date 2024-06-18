@@ -24,6 +24,12 @@ impl<'a> Cpu<'a> {
         }
     }
 
+    pub fn start(&mut self, memory: &mut Memory) {
+        loop {
+            self.execute_cycle(memory);
+        }
+    }
+
     pub fn execute_cycle(&mut self, memory: &mut Memory) {
         let instruction_address = self.gpu.get_instruction_address();
         let opcode = memory.read_word(instruction_address);

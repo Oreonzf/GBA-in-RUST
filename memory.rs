@@ -1,3 +1,6 @@
+use std::fs::File;
+use std::io::Read;
+
 pub struct Memory {
     rom: Vec<u8>,
     ram: Vec<u8>,
@@ -10,6 +13,11 @@ impl Memory {
         let ram = vec![0; ram_size];
         let vram = vec![0; vram_size];
         Memory { rom, ram, vram }
+    }
+
+    pub fn load_rom(&mut self, path: &str) {
+        let mut file = File::open(path).expect("Failed to open ROM file");
+        file.read_to_end(&mut self.rom).expect("Failed to read ROM file");
     }
 
     pub fn read_byte(&self, address: usize) -> u8 {
@@ -26,13 +34,13 @@ impl Memory {
                 if vram_address < vram_len {
                     self.vram[vram_address]
                 } else {
-                    panic!("Endereço de memória fora do intervalo ao tentar ler um byte: {:#X}", address)
+                    panic!("Memory address out of range when reading byte: {:#X}", address)
                 }
             } else {
-                panic!("Endereço de memória fora do intervalo ao tentar ler um byte: {:#X}", address)
+                panic!("Memory address out of range when reading byte: {:#X}", address)
             }
         } else {
-            panic!("Endereço de memória fora do intervalo ao tentar ler um byte: {:#X}", address)
+            panic!("Memory address out of range when reading byte: {:#X}", address)
         }
     }
 
@@ -42,7 +50,7 @@ impl Memory {
         let vram_len = self.vram.len();
 
         if address < rom_len {
-            panic!("Não é possível escrever na ROM: {:#X}", address)
+            panic!("Cannot write to ROM: {:#X}", address)
         } else if let Some(ram_address) = address.checked_sub(rom_len) {
             if ram_address < ram_len {
                 self.ram[ram_address] = value;
@@ -50,13 +58,13 @@ impl Memory {
                 if vram_address < vram_len {
                     self.vram[vram_address] = value;
                 } else {
-                    panic!("Endereço de memória fora do intervalo ao tentar escrever um byte: {:#X}", address)
+                    panic!("Memory address out of range when writing byte: {:#X}", address)
                 }
             } else {
-                panic!("Endereço de memória fora do intervalo ao tentar escrever um byte: {:#X}", address)
+                panic!("Memory address out of range when writing byte: {:#X}", address)
             }
         } else {
-            panic!("Endereço de memória fora do intervalo ao tentar escrever um byte: {:#X}", address)
+            panic!("Memory address out of range when writing byte: {:#X}", address)
         }
     }
 
@@ -90,16 +98,16 @@ impl Memory {
                             self.vram[vram_address + 3],
                         ])
                     } else {
-                        panic!("Endereço de memória fora do intervalo ao tentar ler uma palavra de 32 bits: {:#X}", address)
+                        panic!("Memory address out of range when reading word: {:#X}", address)
                     }
                 } else {
-                    panic!("Endereço de memória fora do intervalo ao tentar ler uma palavra de 32 bits: {:#X}", address)
+                    panic!("Memory address out of range when reading word: {:#X}", address)
                 }
             } else {
-                panic!("Endereço de memória fora do intervalo ao tentar ler uma palavra de 32 bits: {:#X}", address)
+                panic!("Memory address out of range when reading word: {:#X}", address)
             }
         } else {
-            panic!("Endereço de memória inválido ao tentar ler uma palavra de 32 bits: {:#X}", address)
+            panic!("Invalid memory address when reading word: {:#X}", address)
         }
     }
 
@@ -112,7 +120,7 @@ impl Memory {
             let vram_len = self.vram.len();
 
             if checked_address < rom_len {
-                panic!("Não é possível escrever na ROM: {:#X}", address)
+                panic!("Cannot write to ROM: {:#X}", address)
             } else if let Some(ram_address) = checked_address.checked_sub(rom_len) {
                 if ram_address < ram_len {
                     self.ram[ram_address..ram_address + 4].copy_from_slice(&bytes);
@@ -120,16 +128,16 @@ impl Memory {
                     if vram_address < vram_len {
                         self.vram[vram_address..vram_address + 4].copy_from_slice(&bytes);
                     } else {
-                        panic!("Endereço de memória fora do intervalo ao tentar escrever uma palavra de 32 bits: {:#X}", address)
+                        panic!("Memory address out of range when writing word: {:#X}", address)
                     }
                 } else {
-                    panic!("Endereço de memória fora do intervalo ao tentar escrever uma palavra de 32 bits: {:#X}", address)
+                    panic!("Memory address out of range when writing word: {:#X}", address)
                 }
             } else {
-                panic!("Endereço de memória fora do intervalo ao tentar escrever uma palavra de 32 bits: {:#X}", address)
+                panic!("Memory address out of range when writing word: {:#X}", address)
             }
         } else {
-            panic!("Endereço de memória inválido ao tentar escrever uma palavra de 32 bits: {:#X}", address)
+            panic!("Invalid memory address when writing word: {:#X}", address)
         }
     }
 }

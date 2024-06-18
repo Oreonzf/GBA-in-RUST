@@ -1,10 +1,13 @@
+use crate::memory::Memory;
 use minifb::{Key, Window, WindowOptions};
+use std::time::{Duration, Instant};
 
 pub struct Gpu {
     pub screen_width: usize,
     pub screen_height: usize,
     pub frame_buffer: Vec<u32>,
     pub pc: usize,
+    pub memory: Memory, // Adicionar referência à memória
 }
 
 impl Gpu {
@@ -14,6 +17,7 @@ impl Gpu {
             screen_height,
             frame_buffer: vec![0; screen_width * screen_height],
             pc: 0,
+            memory: Memory::new(vec![], 8192, 8192), // Inicializar memória
         }
     }
 
@@ -33,6 +37,10 @@ impl Gpu {
         println!("Test command sent");
     }
 
+    pub fn load_rom(&mut self, path: &str) {
+        self.memory.load_rom(path);
+    }
+
     pub fn run_menu(&mut self) {
         let mut window = Window::new(
             "Gameboy Advanced Emulator Menu",
@@ -41,46 +49,114 @@ impl Gpu {
             WindowOptions::default(),
         ).expect("Error creating window");
 
-        let menu_items = vec!["TEST1", "TEST2", "TEST3"];
+        let menu_items = vec!["Start Game", "Load Game", "Settings", "Exit"];
         let mut selected_item = 0;
+
+        let mut last_update = Instant::now();
 
         while window.is_open() && !window.is_key_down(Key::Escape) {
             self.clear_screen(0x000000); // Clear screen
-            self.draw_menu(&menu_items, selected_item); // Draw menu
-
-            for t in window.get_keys() {
-                match t {
-                    Key::Up => {
-                        if selected_item > 0 {
-                            selected_item -= 1;
-                        }
-                    }
-                    Key::Down => {
-                        if selected_item < menu_items.len() - 1 {
-                            selected_item += 1;
-                        }
-                    }
-                    Key::Enter => {
-                        match selected_item {
-                            0 => println!("Starting TEST1..."),
-                            1 => println!("Starting TEST2..."),
-                            2 => {
-                                println!("Exiting...");
-                                return; // Exit the function
-                            }
-                            _ => (),
-                        }
-                    }
-                    _ => (),
-                }
-            }
+            self.draw_header("Main Menu", 50, 20, 0x00FF00);
+            self.draw_menu(&menu_items, selected_item);
+            self.draw_instructions(50, self.screen_height as u32 - 50, 0xFFFFFF);
 
             window.update_with_buffer(&self.frame_buffer, self.screen_width, self.screen_height)
                 .expect("Failed to update window");
+
+            if last_update.elapsed() >= Duration::from_millis(100) {
+                let keys = window.get_keys();
+                for key in keys {
+                    match key {
+                        Key::Up => {
+                            if selected_item > 0 {
+                                selected_item -= 1;
+                            }
+                        }
+                        Key::Down => {
+                            if selected_item < menu_items.len() - 1 {
+                                selected_item += 1;
+                            }
+                        }
+                        Key::Enter => match selected_item {
+                            0 => self.start_game(),
+                            1 => self.load_game(),
+                            2 => self.settings(&mut window),
+                            3 => {
+                                println!("Exiting...");
+                                return;
+                            }
+                            _ => (),
+                        },
+                        _ => (),
+                    }
+                }
+                last_update = Instant::now();
+            }
         }
     }
 
-    fn draw_text(&mut self, text: &str, start_x: u32, start_y: u32, color: u32) {
+    pub fn start_game(&self) {
+        println!("Start Game selected");
+        // Implement start game logic
+    }
+
+    pub fn load_game(&self) {
+        println!("Load Game selected");
+        // Implement load game logic
+    }
+
+    pub fn settings(&mut self, window: &mut Window) {
+        let submenu_items = vec!["Option 1", "Option 2", "Back"];
+        let mut selected_item = 0;
+
+        let mut last_update = Instant::now();
+
+        while window.is_open() && !window.is_key_down(Key::Escape) {
+            self.clear_screen(0x000000); // Clear screen
+            self.draw_header("Settings", 50, 20, 0x00FF00);
+            self.draw_menu(&submenu_items, selected_item);
+            self.draw_instructions(50, self.screen_height as u32 - 50, 0xFFFFFF);
+
+            window.update_with_buffer(&self.frame_buffer, self.screen_width, self.screen_height)
+                .expect("Failed to update window");
+
+            if last_update.elapsed() >= Duration::from_millis(100) {
+                let keys = window.get_keys();
+                for key in keys {
+                    match key {
+                        Key::Up => {
+                            if selected_item > 0 {
+                                selected_item -= 1;
+                            }
+                        }
+                        Key::Down => {
+                            if selected_item < submenu_items.len() - 1 {
+                                selected_item += 1;
+                            }
+                        }
+                        Key::Enter => match selected_item {
+                            0 => println!("Option 1 selected"),
+                            1 => println!("Option 2 selected"),
+                            2 => return,
+                            _ => (),
+                        },
+                        _ => (),
+                    }
+                }
+                last_update = Instant::now();
+            }
+        }
+    }
+
+    pub fn draw_header(&mut self, text: &str, x: u32, y: u32, color: u32) {
+        self.draw_text(text, x, y, color);
+    }
+
+    pub fn draw_instructions(&mut self, x: u32, y: u32, color: u32) {
+        self.draw_text("Use Up/Down to navigate, Enter to select", x, y, color);
+    }
+
+    pub fn draw_text(&mut self, text: &str, start_x: u32, start_y: u32, color: u32) {
         for (i, c) in text.chars().enumerate() {
             if let Some(bitmap) = crate::font::get_char_bitmap(c) {
                 self.draw_bitmap(bitmap, start_x + (i * 8) as u32, start_y, color);

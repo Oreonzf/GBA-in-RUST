@@ -9,6 +9,7 @@ edition = "2021"
 minifb = "0.27.0"
 hvm = "2.0.17"
 rusttype = "0.9.3"
+rfd = "0.14.1"
 
 [[bin]]
 name = "src"
